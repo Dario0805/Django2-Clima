@@ -22,6 +22,12 @@ ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.
 # El admin en https exige confianza explícita del origen (protección CSRF de Django).
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
 
+# Render define RENDER_EXTERNAL_HOSTNAME automáticamente con el dominio del servicio.
+RENDER_HOST = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_HOST:
+    ALLOWED_HOSTS.append(RENDER_HOST)
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_HOST}')
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -141,3 +147,10 @@ OPEN_METEO_BASE_PRONOSTICO = os.getenv(
     'OPEN_METEO_BASE_PRONOSTICO',
     'https://api.open-meteo.com/v1/forecast',
 )
+
+# Render usa un proxy que termina el HTTPS; así Django reconoce la conexión segura.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
