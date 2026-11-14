@@ -1,36 +1,24 @@
-# Render — configuración del servicio web.
-# Crea una base de datos PostgreSQL en Render y enlázala con DATABASE_URL.
-# Build: instala Python y Node, empaqueta el frontend y recolecta estáticos.
-# Start: gunicorn sirve Django; whitenoise entrega estáticos y panel de React.
+# Render: configuración del servicio web.
+# Usa la base PostgreSQL ya creada en Render (open-meteo) mediante DATABASE_URL.
+# Build: instala dependencias, recolecta estáticos y migra (ver Backend/build.sh).
+# Start: gunicorn sirve Django; WhiteNoise entrega estáticos y el panel de React
+# (el build de Vite ya está subido en Backend/static_frontend/).
 
- databases:
-   - name: taller-clima-db
-     databaseName: taller_clima
-     user: taller_clima_user
-     plan: free
-
- services:
-   - type: web
-     name: taller-clima
-     runtime: python
-     plan: free
-     rootDir: Backend
-     buildCommand: |
-       pip install -r requirements.txt
-       cd ../Frontend && npm ci && npm run build
-       cd ../Backend && python manage.py collectstatic --noinput
-       python manage.py migrate
-     startCommand: gunicorn config.wsgi:application --log-file -
-     envVars:
-       - key: SECRET_KEY
-         generateValue: true
-       - key: DEBUG
-         value: False
-       - key: DATABASE_URL
-         fromDatabase:
-           name: taller-clima-db
-           property: connectionString
-       - key: ALLOWED_HOSTS
-         value: .onrender.com
-       - key: CSRF_TRUSTED_ORIGINS
-         value: https://taller-clima.onrender.com
+services:
+  - type: web
+    name: taller-clima
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: Backend
+    buildCommand: bash build.sh
+    startCommand: gunicorn config.wsgi:application --log-file -
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
