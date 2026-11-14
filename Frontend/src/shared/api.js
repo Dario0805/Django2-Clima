@@ -1,12 +1,16 @@
 /**
  * Cliente HTTP para la API de clima (Django REST Framework).
  *
- * - `API_URL` apunta a /api/ del backend. En desarrollo es http://127.0.0.1:8000/api.
+ * - `API_URL` apunta a /api/ del backend. En desarrollo (npm run dev) usa
+ *   http://127.0.0.1:8000/api; en producción (npm run build) usa la ruta
+ *   relativa /api, porque Django sirve el panel y la API desde el mismo dominio.
  * - `peticion` captura errores de red (servidor abajo o CORS mal configurado).
  * - `pedirOExplotar` traduce códigos HTTP a mensajes accionables para el usuario.
  * - `authHeader` adjunta el token guardado en localStorage tras iniciar sesión.
  */
-export const API_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000/api'
+export const API_URL =
+  import.meta.env.VITE_API_URL ??
+  (import.meta.env.DEV ? 'http://127.0.0.1:8000/api' : '/api')
 
 const CLAVE_TOKEN = 'taller-clima-token'
 
@@ -23,7 +27,7 @@ const PISTAS_HTTP = {
   403: 'HTTP 403 · el servidor entendió pero no autoriza.',
   404: 'HTTP 404 · el recurso NO existe: ruta mal escrita o id inexistente.',
   405: 'HTTP 405 · el verbo HTTP no está permitido en esa ruta.',
-  500: 'HTTP 500 · error interno del servidor: revisa la terminal de Django.',
+  500: 'HTTP 500 · error interno del servidor: revisa los Logs de Render o la terminal de Django.',
   502: 'HTTP 502 · el backend no pudo contactar a Open-Meteo.',
 }
 
@@ -49,8 +53,11 @@ export async function pedirOExplotar(ruta, opciones = {}) {
   } catch {
     throw new FallaApi(
       'cors',
-      'No hubo respuesta de Django. Revisa que el servidor esté activo ' +
-        'en el puerto 8000 y que CORS esté configurado.',
+      import.meta.env.DEV
+        ? 'No hubo respuesta de Django. Revisa que el servidor esté activo ' +
+            'en el puerto 8000 y que CORS esté configurado.'
+        : 'No hubo respuesta del servidor. Si usas el plan gratuito de Render, ' +
+            'puede estar despertando: espera unos segundos y pulsa Reintentar.',
     )
   }
   const ms = Math.round(performance.now() - inicio)
