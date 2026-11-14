@@ -5,4 +5,4 @@ pip install -r requirements.txt
 python manage.py collectstatic --no-input
 python manage.py migrate
 python manage.py crear_admin
-python manage.py descargar_clima
+python manage.py descargar_clima --sembrar-ciudades || true
