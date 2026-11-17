@@ -221,6 +221,51 @@ def consultar_actual(ciudad: Ciudad) -> dict:
     }
 
 
+def consultar_actual_respaldo(ciudad: Ciudad) -> dict:
+    """Respaldo: condiciones actuales desde MET Norway (api.met.no).
+
+    Se usa cuando Open-Meteo responde 429 (limite por IP compartida de
+    Render). Es gratuito, sin clave, pero exige un User-Agent propio.
+    Devuelve el mismo formato que `consultar_actual`.
+    """
+    import json
+    from urllib.request import Request, urlopen
+
+    url = (
+        'https://api.met.no/weatherapi/locationforecast/2.0/compact'
+        f'?lat={float(ciudad.latitud):.4f}&lon={float(ciudad.longitud):.4f}'
+    )
+    peticion = Request(url, headers={
+        'User-Agent': 'ClimaDjangoTaller/1.0 github.com/Dario0805/Django2-Clima',
+    })
+    with urlopen(peticion, timeout=15) as respuesta:
+        payload = json.loads(respuesta.read().decode('utf-8'))
+
+    serie = payload['properties']['timeseries'][0]
+    detalle = serie['data']['instant']['details']
+    siguiente = (serie['data'].get('next_1_hours') or {}).get('details') or {}
+    viento_ms = detalle.get('wind_speed')
+    return {
+        'ciudad': ciudad.nombre,
+        'pais': ciudad.pais,
+        'latitud': float(ciudad.latitud),
+        'longitud': float(ciudad.longitud),
+        'tiempo': serie.get('time'),
+        'temperatura': detalle.get('air_temperature'),
+        'humedad_relativa': detalle.get('relative_humidity'),
+        'precipitacion': siguiente.get('precipitation_amount'),
+        'codigo_clima': None,
+        'velocidad_viento': round(viento_ms * 3.6, 1) if viento_ms is not None else None,
+        'fuente': 'MET Norway',
+        'unidades': {
+            'temperatura': '°C',
+            'humedad_relativa': '%',
+            'precipitacion': 'mm',
+            'velocidad_viento': 'km/h',
+        },
+    }
+
+
 def descargar_mediciones(ciudades_list, fecha_inicio, fecha_fin) -> dict:
     """Descarga el histórico de varias ciudades y lo inserta en bloque.
 

@@ -21,6 +21,7 @@ import csv
 import time
 
 from django.contrib.auth import authenticate
+from django.core.cache import cache
 from django.http import HttpResponse
 from rest_framework import filters, status, viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -28,7 +29,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 
-from .fuente_open_meteo import consultar_actual, descargar_mediciones
+from .fuente_open_meteo import (
+    consultar_actual,
+    consultar_actual_respaldo,
+    descargar_mediciones,
+)
 from .models import Ciudad, Medicion
 from .serializers import CiudadSerializer, MedicionSerializer
 
@@ -299,13 +304,53 @@ class ClimaActualView(APIView):
                 {'detalle': 'La ciudad no existe.'},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        clave = f'clima_actual_{ciudad.pk}'
+        datos = cache.get(clave)
+        if datos is not None:
+            return Response(datos)
+
+        # 1) Open-Meteo  2) MET Norway (respaldo en vivo)  3) caché viejo
+        # 4) última medición guardada en la base de datos.
         try:
             datos = consultar_actual(ciudad)
         except Exception as error:  # noqa: BLE001
-            return Response(
-                {'detalle': f'Open-Meteo no respondió: {error}'},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
+            try:
+                datos = consultar_actual_respaldo(ciudad)
+            except Exception:  # noqa: BLE001
+                ultimo = cache.get(clave + '_ultimo')
+                if ultimo is not None:
+                    return Response({**ultimo, 'desactualizado': True})
+                med = (
+                    Medicion.objects.filter(ciudad=ciudad)
+                    .order_by('-fecha').first()
+                )
+                if med is not None:
+                    return Response({
+                        'ciudad': ciudad.nombre,
+                        'pais': ciudad.pais,
+                        'latitud': float(ciudad.latitud),
+                        'longitud': float(ciudad.longitud),
+                        'tiempo': med.fecha.isoformat(),
+                        'temperatura': float(med.temp_media),
+                        'humedad_relativa': None,
+                        'precipitacion': float(med.precipitacion),
+                        'codigo_clima': med.codigo_clima,
+                        'velocidad_viento': float(med.velocidad_viento),
+                        'fuente': 'Última medición guardada',
+                        'desactualizado': True,
+                        'unidades': {
+                            'temperatura': '°C',
+                            'humedad_relativa': '%',
+                            'precipitacion': 'mm',
+                            'velocidad_viento': 'km/h',
+                        },
+                    })
+                return Response(
+                    {'detalle': f'Open-Meteo no respondió: {error}'},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+        cache.set(clave, datos, 600)
+        cache.set(clave + '_ultimo', datos, 86400)
         return Response(datos)
 
 
