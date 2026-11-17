@@ -44,17 +44,19 @@ VARIABLES_HISTORICO = (
 )
 
 
-def _get_json(url: str, timeout: int = 90) -> dict:
+def _get_json(url: str, timeout: int = 90, intentos: int = 4) -> dict:
     """Realiza la petición GET a Open-Meteo y devuelve el JSON ya parseado.
 
     Open-Meteo limita a 5 peticiones/segundo en el plan gratis. Si responde
     429 (Too Many Requests) o lanza un error transitorio, reintenta con
-    backoff exponencial (5s, 10s, 20s, 40s) hasta 4 intentos.
+    backoff exponencial (5s, 10s, 20s, 40s) hasta `intentos` intentos (4 por
+    defecto). Las consultas en vivo, que atiende un usuario esperando, usan
+    intentos=1 para fallar rápido y no superar el timeout de Gunicorn.
     """
     import time
     from urllib.error import HTTPError, URLError
 
-    INTENTOS = 4
+    INTENTOS = max(1, intentos)
     PAUSAS = [5, 10, 20, 40]  # segundos entre reintentos ante 429
 
     for intento in range(INTENTOS):
@@ -196,7 +198,7 @@ def consultar_actual(ciudad: Ciudad) -> dict:
         'timezone': 'America/Bogota',
     }
     url = f'{URL_PRONOSTICO}?{urlencode(parametros)}'
-    payload = _get_json(url)
+    payload = _get_json(url, timeout=15, intentos=1)
     actual = payload.get('current') or {}
     unidades = payload.get('current_units') or {}
     return {
