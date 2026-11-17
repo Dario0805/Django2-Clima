@@ -3,7 +3,7 @@
 
 export const DESARROLLADOR = {
   // Reemplaza por tu nombre completo si lo deseas.
-  nombre: 'Dario',
+  nombre: 'Alderson Dario Bohorquez',
   rol: 'Desarrollador del proyecto',
   taller: 'Taller Django + React · Proyecto final individual',
   fecha: 'Noviembre de 2026',
